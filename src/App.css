@@ -194,3 +194,36 @@ button:disabled {
 .home-button:hover {
   background-color: #0b7dda;
 }
+
+/* 为下拉菜单添加样式 */
+.dropdown-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  background-color: white;
+  font-size: 16px;
+}
+
+/* 付款历史样式 */
+.payment-history {
+  margin-top: 20px;
+  background-color: #f8f8f8;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.payment-list {
+  list-style: none;
+  padding: 0;
+}
+
+.payment-list li {
+  padding: 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+  background-color: #fff;
+  border-left: 4px solid #9e9e9e;
+}
