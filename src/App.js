@@ -10,6 +10,8 @@ function App() {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [paymentName, setPaymentName] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  // 新增花费项目状态
+  const [paymentDescription, setPaymentDescription] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +41,6 @@ function App() {
         setError('请输入房间标题并至少添加两个成员！');
         return;
       }
-
       const response = await fetch(`${API_URL}/create_room`, {
         method: 'POST',
         headers: {
@@ -50,12 +51,10 @@ function App() {
           members: filteredMembers,
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || '创建房间失败');
       }
-
       const data = await response.json();
       setCurrentRoomId(data.room_id);
       setPage('room');
@@ -76,13 +75,11 @@ function App() {
         setError('请输入有效的房间ID！');
         return;
       }
-
       const response = await fetch(`${API_URL}/result/${joinRoomId}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || '房间不存在');
       }
-
       const data = await response.json();
       setCurrentRoomId(joinRoomId);
       setPage('room');
@@ -104,7 +101,8 @@ function App() {
         setError('请输入姓名和付款金额！');
         return;
       }
-
+      
+      // 修改后端API调用，添加description字段
       const response = await fetch(`${API_URL}/submit_payment/${currentRoomId}`, {
         method: 'POST',
         headers: {
@@ -113,17 +111,17 @@ function App() {
         body: JSON.stringify({
           name: paymentName,
           amount: parseFloat(paymentAmount),
+          description: paymentDescription || '未指定' // 添加花费项目描述
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || '付款提交失败');
       }
-
       alert('付款提交成功！');
       setPaymentName('');
       setPaymentAmount('');
+      setPaymentDescription(''); // 清空描述
       await fetchResult();
     } catch (err) {
       setError(err.message);
@@ -194,7 +192,6 @@ function App() {
           disabled={loading}
         />
       </div>
-
       <div className="form-group">
         <label>添加成员</label>
         <div className="input-group">
@@ -209,7 +206,6 @@ function App() {
           <button onClick={addMember} disabled={loading}>添加</button>
         </div>
       </div>
-
       <div className="members-list">
         <h3>成员列表</h3>
         <ul>
@@ -223,7 +219,6 @@ function App() {
           ))}
         </ul>
       </div>
-
       <div className="button-group">
         <button onClick={createRoom} disabled={loading}>
           {loading ? '创建中...' : '创建房间'}
@@ -266,16 +261,32 @@ function App() {
           复制ID
         </button>
       </div>
-
       <div className="form-group">
         <h3>提交付款</h3>
         <div>
           <label>姓名</label>
-          <input
-            type="text"
+          {/* 将输入框改为下拉选单 */}
+          <select
             value={paymentName}
             onChange={(e) => setPaymentName(e.target.value)}
-            placeholder="您的姓名"
+            disabled={loading}
+            className="dropdown-select"
+          >
+            <option value="">请选择姓名</option>
+            {result && result.title && result.balances && 
+              Object.keys(result.balances).map((name, index) => (
+                <option key={index} value={name}>{name}</option>
+              ))
+            }
+          </select>
+        </div>
+        <div>
+          <label>花费项目</label>
+          <input
+            type="text"
+            value={paymentDescription}
+            onChange={(e) => setPaymentDescription(e.target.value)}
+            placeholder="例如：晚餐、出租车"
             disabled={loading}
           />
         </div>
@@ -294,7 +305,6 @@ function App() {
           {loading ? '提交中...' : '提交付款'}
         </button>
       </div>
-
       {result && (
         <div className="result-section">
           <h3>分账结果</h3>
@@ -319,7 +329,6 @@ function App() {
               </li>
             ))}
           </ul>
-
           <h4>转账明细</h4>
           {result.transactions && result.transactions.length > 0 ? (
             <ul className="transaction-list">
@@ -332,9 +341,24 @@ function App() {
           ) : (
             <p>没有需要转账的款项</p>
           )}
+
+          {/* 显示付款历史 */}
+          {result.payments && Object.keys(result.payments).length > 0 && (
+            <div className="payment-history">
+              <h4>付款记录</h4>
+              <ul className="payment-list">
+                {Object.entries(result.payments || {}).map(([name, amount], index) => (
+                  <li key={index}>
+                    {name}: {parseFloat(amount).toFixed(2)}
+                    {result.payment_descriptions && result.payment_descriptions[name] && 
+                      ` (${result.payment_descriptions[name]})`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
-
       <button onClick={goHome} className="home-button" disabled={loading}>
         返回首页
       </button>
