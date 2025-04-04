@@ -48,7 +48,7 @@ function App() {
         ...data,
         members: data.members.map(name => decodeUnicode(name)),
         payments: Object.fromEntries(
-          Object.entries(data.payments).map(([k, v]) => [decodeUnicode(k), v])
+          Object.entries(data.payments).map(([k, v]) => [decodeUnicode(k), v]))
       };
       
       setResult(decodedData);
