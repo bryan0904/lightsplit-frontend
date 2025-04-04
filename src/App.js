@@ -16,7 +16,7 @@ function App() {
   const [error, setError] = useState('');
 
   // API endpoint
-  const API_URL = 'https://lightsplit-backend.onrender.com;
+  const API_URL = 'https://lightsplit-backend.onrender.com';
 
   // Add member function
   const addMember = () => {
