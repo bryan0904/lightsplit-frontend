@@ -1,252 +1,365 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './App.css';
 
 function App() {
+  // State variables
   const [page, setPage] = useState('home');
   const [roomTitle, setRoomTitle] = useState('');
-  const [members, setMembers] = useState(['']);
+  const [members, setMembers] = useState(['', '']);
+  const [memberInput, setMemberInput] = useState('');
   const [currentRoomId, setCurrentRoomId] = useState('');
+  const [joinRoomId, setJoinRoomId] = useState('');
   const [paymentName, setPaymentName] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // API endpoint
   const API_URL = 'https://lightsplit-backend-2.onrender.com';
 
-  // Unicode解码函数
-  const decodeUnicode = (str) => {
-    return str.replace(/\\u[\dA-Fa-f]{4}/g, 
-      match => String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16))
-    );
+  // Add member function
+  const addMember = () => {
+    if (memberInput.trim() !== '') {
+      setMembers([...members, memberInput]);
+      setMemberInput('');
+    }
   };
 
-  // 自动恢复房间
-  useEffect(() => {
-    const savedRoomId = localStorage.getItem('roomId');
-    if (savedRoomId) {
-      setCurrentRoomId(savedRoomId);
-      setPage('room');
-      fetchResult(savedRoomId);
-    }
-  }, []);
+  // Remove member function
+  const removeMember = (index) => {
+    const newMembers = [...members];
+    newMembers.splice(index, 1);
+    setMembers(newMembers);
+  };
 
-  // 保存房间ID
-  useEffect(() => {
-    if (currentRoomId) {
-      localStorage.setItem('roomId', currentRoomId);
-    }
-  }, [currentRoomId]);
-
-  // 获取房间数据
-  const fetchResult = async (roomId) => {
+  // Create room function
+  const createRoom = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/result/${roomId}`);
+      setError('');
+      const filteredMembers = members.filter(member => member.trim() !== '');
+      
+      if (roomTitle.trim() === '' || filteredMembers.length < 2) {
+        setError('请输入房间标题并至少添加两个成员！');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/create_room`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: roomTitle,
+          members: filteredMembers,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('创建房间失败');
+      }
+
       const data = await response.json();
-      
-      // 解码Unicode中文
-      const decodedData = {
-        ...data,
-        members: data.members.map(name => decodeUnicode(name)),
-        payments: Object.fromEntries(
-          Object.entries(data.payments).map(([k, v]) => [decodeUnicode(k), v])
-        )
-      };
-      
-      setResult(decodedData);
-      setMembers(decodedData.members);
+      setCurrentRoomId(data.room_id);
+      setPage('room');
     } catch (err) {
-      console.error('获取数据失败:', err);
+      setError(err.message);
+      console.error('创建房间出错:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 创建房间
-  const createRoom = async () => {
-    const filteredMembers = members.filter(m => m.trim() !== '');
+  // Join room function
+  const joinRoom = async () => {
     try {
-      const response = await fetch(`${API_URL}/create_room`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          title: roomTitle, 
-          members: filteredMembers 
-        })
-      });
+      setLoading(true);
+      setError('');
+      
+      if (joinRoomId.trim() === '') {
+        setError('请输入有效的房间ID！');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/result/${joinRoomId}`);
+      
+      if (!response.ok) {
+        throw new Error('房间不存在');
+      }
+
       const data = await response.json();
-      setCurrentRoomId(data.room_id);
+      setCurrentRoomId(joinRoomId);
+      setResult(data);
       setPage('room');
     } catch (err) {
-      console.error('创建房间失败:', err);
+      setError(err.message);
+      console.error('加入房间出错:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 提交付款
+  // Submit payment function
   const submitPayment = async () => {
     try {
-      await fetch(`${API_URL}/submit_payment/${currentRoomId}`, {
+      setLoading(true);
+      setError('');
+      
+      if (paymentName.trim() === '' || !paymentAmount || parseFloat(paymentAmount) <= 0) {
+        setError('请输入姓名和有效的付款金额！');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/submit_payment/${currentRoomId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name: paymentName, 
-          amount: parseFloat(paymentAmount) 
-        })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: paymentName,
+          amount: parseFloat(paymentAmount),
+        }),
       });
-      fetchResult(currentRoomId);
+
+      if (!response.ok) {
+        throw new Error('付款提交失败');
+      }
+
+      // Fetch updated results
+      await fetchResult();
+      
+      // Reset payment inputs
       setPaymentName('');
       setPaymentAmount('');
     } catch (err) {
-      console.error('提交付款失败:', err);
+      setError(err.message);
+      console.error('提交付款出错:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 返回主页
-  const goToHome = () => {
-    setPage('home');
-    setCurrentRoomId('');
-    localStorage.removeItem('roomId');
+  // Fetch result function
+  const fetchResult = async () => {
+    try {
+      const response = await fetch(`${API_URL}/result/${currentRoomId}`);
+      
+      if (!response.ok) {
+        throw new Error('获取结果失败');
+      }
+
+      const data = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+      console.error('获取结果出错:', err);
+    }
   };
 
-  return (
-    <div className="App">
-      {page === 'home' && (
-        <div className="container">
-          <h1>轻松分账</h1>
-          <div className="form-group">
-            <label>房间标题</label>
+  // Reset function
+  const goHome = () => {
+    setPage('home');
+    setRoomTitle('');
+    setMembers(['', '']);
+    setCurrentRoomId('');
+    setJoinRoomId('');
+    setResult(null);
+    setError('');
+  };
+
+  // Copy room ID function
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(currentRoomId);
+    alert('房间ID已复制到剪贴板！');
+  };
+
+  // Render home page
+  const renderHome = () => (
+    <div className="container">
+      <h1>轻松分账</h1>
+      {error && <div className="error-message">{error}</div>}
+      <div className="button-group">
+        <button onClick={() => setPage('createRoom')} disabled={loading}>
+          {loading ? '处理中...' : '创建新房间'}
+        </button>
+        <button onClick={() => setPage('joinRoom')} disabled={loading}>
+          {loading ? '处理中...' : '加入已有房间'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Render create room page
+  const renderCreateRoom = () => (
+    <div className="container">
+      <h1>创建分账房间</h1>
+      {error && <div className="error-message">{error}</div>}
+      <div className="form-group">
+        <label>房间标题</label>
+        <input
+          type="text"
+          value={roomTitle}
+          onChange={(e) => setRoomTitle(e.target.value)}
+          placeholder="例如：周末聚餐"
+          disabled={loading}
+        />
+      </div>
+      <div className="form-group">
+        <label>成员列表</label>
+        {members.map((member, index) => (
+          <div key={index} className="input-group">
             <input
               type="text"
-              value={roomTitle}
-              onChange={(e) => setRoomTitle(e.target.value)}
-              placeholder="输入房间标题"
-            />
-          </div>
-          <div className="form-group">
-            <label>成员</label>
-            {members.map((member, index) => (
-              <div key={index} className="input-group">
-                <input
-                  type="text"
-                  value={member}
-                  onChange={(e) => {
-                    const newMembers = [...members];
-                    newMembers[index] = e.target.value;
-                    setMembers(newMembers);
-                  }}
-                  placeholder="成员名称"
-                />
-                {index === members.length - 1 ? (
-                  <button onClick={() => setMembers([...members, ''])}>+</button>
-                ) : (
-                  <button onClick={() => {
-                    const newMembers = [...members];
-                    newMembers.splice(index, 1);
-                    setMembers(newMembers);
-                  }}>-</button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="button-group">
-            <button 
-              onClick={createRoom}
-              disabled={!roomTitle || members.filter(m => m.trim()).length < 2}
-            >
-              创建房间
-            </button>
-          </div>
-        </div>
-      )}
-
-      {page === 'room' && result && (
-        <div className="container">
-          <h1>{result.title}</h1>
-          
-          <div className="room-id-container">
-            <div className="room-id">房间ID: {currentRoomId}</div>
-            <button 
-              className="copy-button"
-              onClick={() => {
-                navigator.clipboard.writeText(currentRoomId);
-                alert('已复制房间ID到剪贴板');
+              value={member}
+              onChange={(e) => {
+                const newMembers = [...members];
+                newMembers[index] = e.target.value;
+                setMembers(newMembers);
               }}
-            >
-              复制
-            </button>
+              placeholder="成员姓名"
+              disabled={loading}
+            />
+            <button onClick={() => removeMember(index)} disabled={loading || members.length <= 2}>删除</button>
+          </div>
+        ))}
+        <div className="input-group">
+          <input
+            type="text"
+            value={memberInput}
+            onChange={(e) => setMemberInput(e.target.value)}
+            placeholder="添加更多成员"
+            onKeyPress={(e) => e.key === 'Enter' && addMember()}
+            disabled={loading}
+          />
+          <button onClick={addMember} disabled={loading || !memberInput.trim()}>添加</button>
+        </div>
+      </div>
+      <div className="button-group">
+        <button onClick={createRoom} disabled={loading || roomTitle.trim() === '' || members.filter(m => m.trim()).length < 2}>
+          {loading ? '创建中...' : '创建房间'}
+        </button>
+        <button onClick={goHome} disabled={loading}>返回</button>
+      </div>
+    </div>
+  );
+
+  // Render join room page
+  const renderJoinRoom = () => (
+    <div className="container">
+      <h1>加入分账房间</h1>
+      {error && <div className="error-message">{error}</div>}
+      <div className="form-group">
+        <label>房间ID</label>
+        <input
+          type="text"
+          value={joinRoomId}
+          onChange={(e) => setJoinRoomId(e.target.value)}
+          placeholder="输入房间ID"
+          disabled={loading}
+        />
+      </div>
+      <div className="button-group">
+        <button onClick={joinRoom} disabled={loading || !joinRoomId.trim()}>
+          {loading ? '加入中...' : '加入房间'}
+        </button>
+        <button onClick={goHome} disabled={loading}>返回</button>
+      </div>
+    </div>
+  );
+
+  // Render room page
+  const renderRoom = () => (
+    <div className="container">
+      <h1>{result?.title || '分账房间'}</h1>
+      {error && <div className="error-message">{error}</div>}
+      <div className="room-id-container">
+        <p className="room-id">房间ID: {currentRoomId}</p>
+        <button onClick={copyRoomId} className="copy-button" disabled={loading}>
+          复制ID
+        </button>
+      </div>
+      <div className="form-group">
+        <h3>提交付款</h3>
+        <div>
+          <label>姓名</label>
+          <input
+            type="text"
+            value={paymentName}
+            onChange={(e) => setPaymentName(e.target.value)}
+            placeholder="您的姓名"
+            disabled={loading}
+          />
+        </div>
+        <div>
+          <label>金额</label>
+          <input
+            type="number"
+            value={paymentAmount}
+            onChange={(e) => setPaymentAmount(e.target.value)}
+            placeholder="付款金额"
+            step="0.01"
+            min="0"
+            disabled={loading}
+          />
+        </div>
+        <button onClick={submitPayment} disabled={loading || !paymentName.trim() || !paymentAmount || parseFloat(paymentAmount) <= 0}>
+          {loading ? '提交中...' : '提交付款'}
+        </button>
+      </div>
+      {result && (
+        <div className="result-section">
+          <h3>分账结果</h3>
+          
+          <div className="summary-info">
+            <p>总支出: <strong>{result.total_spent?.toFixed(2)}</strong></p>
+            <p>人均支出: <strong>{result.average_per_person?.toFixed(2)}</strong></p>
           </div>
           
-          {/* 付款表单 */}
-          <div className="form-group">
-            <label>添加付款</label>
-            <select
-              className="dropdown-select"
-              value={paymentName}
-              onChange={(e) => setPaymentName(e.target.value)}
-            >
-              <option value="">选择成员</option>
-              {members.map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              placeholder="金额"
-            />
-            <button 
-              onClick={submitPayment}
-              disabled={!paymentName || !paymentAmount}
-            >
-              提交
-            </button>
-          </div>
-
-          {/* 付款历史 */}
-          <div className="payment-history">
-            <h3>付款历史</h3>
-            <ul className="payment-list">
-              {Object.entries(result.payments || {}).map(([name, amount], index) => (
-                <li key={index}>
-                  {name}: {amount} 元
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* 分账结果 */}
-          <div className="result-section">
-            <h3>分账结果</h3>
-            <div className="summary-info">
-              <p>总支出: {result.total_spent} 元</p>
-              <p>每人平均: {result.average_per_person} 元</p>
-            </div>
-            <h4>余额情况</h4>
-            <ul className="balance-list">
-              {Object.entries(result.balances || {}).map(([name, balance]) => (
-                <li key={name} className={balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'}>
-                  {name}: {balance > 0 ? `应收 ${balance} 元` : balance < 0 ? `应付 ${-balance} 元` : '已平账'}
-                </li>
-              ))}
-            </ul>
-            
-            <h4>转账方案</h4>
+          <h4>每人余额</h4>
+          <ul className="balance-list">
+            {Object.entries(result.balances || {}).map(([name, balance]) => (
+              <li 
+                key={name} 
+                className={
+                  balance > 0 ? 'positive' : 
+                  balance < 0 ? 'negative' : 'neutral'
+                }
+              >
+                {name}: {balance > 0 ? `应收 ${balance.toFixed(2)}` : 
+                          balance < 0 ? `应付 ${Math.abs(balance).toFixed(2)}` : '无需支付'}
+              </li>
+            ))}
+          </ul>
+          <h4>转账明细</h4>
+          {result.transactions && result.transactions.length > 0 ? (
             <ul className="transaction-list">
-              {(result.transactions || []).map((tx, index) => (
+              {result.transactions.map((transaction, index) => (
                 <li key={index} className="transaction-item">
-                  <span>{tx.from} 需支付 </span>
-                  <span className="amount">{tx.amount} 元</span>
-                  <span> 给 {tx.to}</span>
+                  {transaction.from} 需要支付 <span className="amount">{transaction.amount.toFixed(2)}</span> 给 {transaction.to}
                 </li>
               ))}
             </ul>
-          </div>
-
-          <button className="home-button" onClick={goToHome}>返回主页</button>
+          ) : (
+            <p>没有需要转账的款项</p>
+          )}
         </div>
       )}
+      <button onClick={goHome} className="home-button" disabled={loading}>
+        返回首页
+      </button>
+    </div>
+  );
 
-      {loading && <div className="loading">加载中...</div>}
+  // Render based on current page
+  return (
+    <div className="App">
+      {page === 'createRoom' ? renderCreateRoom() :
+       page === 'joinRoom' ? renderJoinRoom() :
+       page === 'room' ? renderRoom() : renderHome()}
     </div>
   );
 }
