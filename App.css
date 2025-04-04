@@ -1,6 +1,7 @@
 .App {
   text-align: center;
   font-family: 'Arial', sans-serif;
+  padding: 20px;
 }
 
 .container {
@@ -17,15 +18,12 @@ h1 {
   margin-bottom: 30px;
 }
 
-h3 {
-  margin-top: 30px;
-  color: #444;
-}
-
-h4 {
-  margin-top: 20px;
-  color: #555;
-  text-align: left;
+.error-message {
+  color: #d32f2f;
+  background-color: #ffebee;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
 }
 
 .form-group {
@@ -66,14 +64,23 @@ button {
   cursor: pointer;
   font-size: 16px;
   margin: 5px;
+  transition: background-color 0.3s;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   background-color: #45a049;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 .button-group {
   margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 
 .members-list {
@@ -89,6 +96,7 @@ button:hover {
 .members-list li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 10px;
   background-color: #f0f0f0;
   margin-bottom: 5px;
@@ -112,6 +120,10 @@ button:hover {
   background-color: #607d8b;
   font-size: 14px;
   padding: 5px 10px;
+}
+
+.copy-button:hover {
+  background-color: #546e7a;
 }
 
 .result-section {
