@@ -2,21 +2,20 @@ import React, { useState } from 'react';
 import './App.css';
 
 function App() {
-  // 状态管理
-  const [page, setPage] = useState('home'); // 页面状态：home, createRoom, joinRoom, room
+  const [page, setPage] = useState('home');
   const [roomTitle, setRoomTitle] = useState('');
-  const [members, setMembers] = useState(['']); // 初始一个空成员
+  const [members, setMembers] = useState(['']);
   const [memberInput, setMemberInput] = useState('');
   const [currentRoomId, setCurrentRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [paymentName, setPaymentName] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // API基础URL
   const API_URL = 'https://lightsplit-backend-2.onrender.com';
 
-  // 添加成员
   const addMember = () => {
     if (memberInput.trim() !== '') {
       setMembers([...members, memberInput]);
@@ -24,19 +23,20 @@ function App() {
     }
   };
 
-  // 移除成员
   const removeMember = (index) => {
     const newMembers = [...members];
     newMembers.splice(index, 1);
     setMembers(newMembers);
   };
 
-  // 创建房间
   const createRoom = async () => {
     try {
+      setLoading(true);
+      setError('');
       const filteredMembers = members.filter(member => member.trim() !== '');
+      
       if (roomTitle.trim() === '' || filteredMembers.length < 2) {
-        alert('请输入房间标题并至少添加两个成员！');
+        setError('请输入房间标题并至少添加两个成员！');
         return;
       }
 
@@ -51,44 +51,57 @@ function App() {
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '创建房间失败');
+      }
+
       const data = await response.json();
       setCurrentRoomId(data.room_id);
       setPage('room');
-    } catch (error) {
-      console.error('创建房间出错:', error);
-      alert('创建房间失败，请检查后端服务是否运行。');
+    } catch (err) {
+      setError(err.message);
+      console.error('创建房间出错:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 加入房间
   const joinRoom = async () => {
     try {
+      setLoading(true);
+      setError('');
+      
       if (joinRoomId.trim() === '') {
-        alert('请输入有效的房间ID！');
+        setError('请输入有效的房间ID！');
         return;
       }
 
-      // 先尝试获取结果，验证房间是否存在
       const response = await fetch(`${API_URL}/result/${joinRoomId}`);
       if (!response.ok) {
-        alert('房间不存在，请检查ID是否正确。');
-        return;
+        const errorData = await response.json();
+        throw new Error(errorData.error || '房间不存在');
       }
 
+      const data = await response.json();
       setCurrentRoomId(joinRoomId);
       setPage('room');
-      fetchResult();
-    } catch (error) {
-      console.error('加入房间出错:', error);
-      alert('加入房间失败，请检查后端服务是否运行。');
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+      console.error('加入房间出错:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 提交付款
   const submitPayment = async () => {
     try {
+      setLoading(true);
+      setError('');
+      
       if (paymentName.trim() === '' || !paymentAmount) {
-        alert('请输入姓名和付款金额！');
+        setError('请输入姓名和付款金额！');
         return;
       }
 
@@ -103,61 +116,74 @@ function App() {
         }),
       });
 
-      if (response.ok) {
-        alert('付款提交成功！');
-        setPaymentName('');
-        setPaymentAmount('');
-        fetchResult();
-      } else {
-        alert('付款提交失败，请重试。');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '付款提交失败');
       }
-    } catch (error) {
-      console.error('提交付款出错:', error);
-      alert('提交付款失败，请检查后端服务是否运行。');
+
+      alert('付款提交成功！');
+      setPaymentName('');
+      setPaymentAmount('');
+      await fetchResult();
+    } catch (err) {
+      setError(err.message);
+      console.error('提交付款出错:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 获取结算结果
   const fetchResult = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`${API_URL}/result/${currentRoomId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '获取结果失败');
+      }
       const data = await response.json();
       setResult(data);
-    } catch (error) {
-      console.error('获取结果出错:', error);
+    } catch (err) {
+      setError(err.message);
+      console.error('获取结果出错:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 返回首页
   const goHome = () => {
     setPage('home');
     setRoomTitle('');
     setMembers(['']);
     setCurrentRoomId('');
     setResult(null);
+    setError('');
   };
 
-  // 复制房间ID到剪贴板
   const copyRoomId = () => {
     navigator.clipboard.writeText(currentRoomId);
     alert('房间ID已复制到剪贴板！');
   };
 
-  // 渲染首页
   const renderHome = () => (
     <div className="container">
       <h1>轻松分账</h1>
+      {error && <div className="error-message">{error}</div>}
       <div className="button-group">
-        <button onClick={() => setPage('createRoom')}>创建新房间</button>
-        <button onClick={() => setPage('joinRoom')}>加入已有房间</button>
+        <button onClick={() => setPage('createRoom')} disabled={loading}>
+          {loading ? '处理中...' : '创建新房间'}
+        </button>
+        <button onClick={() => setPage('joinRoom')} disabled={loading}>
+          {loading ? '处理中...' : '加入已有房间'}
+        </button>
       </div>
     </div>
   );
 
-  // 渲染创建房间页面
   const renderCreateRoom = () => (
     <div className="container">
       <h1>创建分账房间</h1>
+      {error && <div className="error-message">{error}</div>}
       <div className="form-group">
         <label>房间标题</label>
         <input
@@ -165,6 +191,7 @@ function App() {
           value={roomTitle}
           onChange={(e) => setRoomTitle(e.target.value)}
           placeholder="例如：周末聚餐"
+          disabled={loading}
         />
       </div>
 
@@ -177,8 +204,9 @@ function App() {
             onChange={(e) => setMemberInput(e.target.value)}
             placeholder="输入成员姓名"
             onKeyPress={(e) => e.key === 'Enter' && addMember()}
+            disabled={loading}
           />
-          <button onClick={addMember}>添加</button>
+          <button onClick={addMember} disabled={loading}>添加</button>
         </div>
       </div>
 
@@ -189,7 +217,7 @@ function App() {
             member.trim() && (
               <li key={index}>
                 {member}
-                <button onClick={() => removeMember(index)}>删除</button>
+                <button onClick={() => removeMember(index)} disabled={loading}>删除</button>
               </li>
             )
           ))}
@@ -197,16 +225,18 @@ function App() {
       </div>
 
       <div className="button-group">
-        <button onClick={createRoom}>创建房间</button>
-        <button onClick={goHome}>返回</button>
+        <button onClick={createRoom} disabled={loading}>
+          {loading ? '创建中...' : '创建房间'}
+        </button>
+        <button onClick={goHome} disabled={loading}>返回</button>
       </div>
     </div>
   );
 
-  // 渲染加入房间页面
   const renderJoinRoom = () => (
     <div className="container">
       <h1>加入分账房间</h1>
+      {error && <div className="error-message">{error}</div>}
       <div className="form-group">
         <label>房间ID</label>
         <input
@@ -214,22 +244,27 @@ function App() {
           value={joinRoomId}
           onChange={(e) => setJoinRoomId(e.target.value)}
           placeholder="输入房间ID"
+          disabled={loading}
         />
       </div>
       <div className="button-group">
-        <button onClick={joinRoom}>加入房间</button>
-        <button onClick={goHome}>返回</button>
+        <button onClick={joinRoom} disabled={loading}>
+          {loading ? '加入中...' : '加入房间'}
+        </button>
+        <button onClick={goHome} disabled={loading}>返回</button>
       </div>
     </div>
   );
 
-  // 渲染房间页面
   const renderRoom = () => (
     <div className="container">
-      <h1>{result?.title || '加载中...'}</h1>
+      <h1>{result?.title || '分账房间'}</h1>
+      {error && <div className="error-message">{error}</div>}
       <div className="room-id-container">
         <p className="room-id">房间ID: {currentRoomId}</p>
-        <button onClick={copyRoomId} className="copy-button">复制ID</button>
+        <button onClick={copyRoomId} className="copy-button" disabled={loading}>
+          复制ID
+        </button>
       </div>
 
       <div className="form-group">
@@ -241,6 +276,7 @@ function App() {
             value={paymentName}
             onChange={(e) => setPaymentName(e.target.value)}
             placeholder="您的姓名"
+            disabled={loading}
           />
         </div>
         <div>
@@ -251,9 +287,12 @@ function App() {
             onChange={(e) => setPaymentAmount(e.target.value)}
             placeholder="付款金额"
             step="0.01"
+            disabled={loading}
           />
         </div>
-        <button onClick={submitPayment}>提交付款</button>
+        <button onClick={submitPayment} disabled={loading}>
+          {loading ? '提交中...' : '提交付款'}
+        </button>
       </div>
 
       {result && (
@@ -268,8 +307,15 @@ function App() {
           <h4>每人余额</h4>
           <ul className="balance-list">
             {Object.entries(result.balances || {}).map(([name, balance]) => (
-              <li key={name} className={balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'}>
-                {name}: {balance > 0 ? `应收 ${balance.toFixed(2)}` : balance < 0 ? `应付 ${Math.abs(balance).toFixed(2)}` : '无需支付'}
+              <li 
+                key={name} 
+                className={
+                  balance > 0 ? 'positive' : 
+                  balance < 0 ? 'negative' : 'neutral'
+                }
+              >
+                {name}: {balance > 0 ? `应收 ${balance.toFixed(2)}` : 
+                          balance < 0 ? `应付 ${Math.abs(balance).toFixed(2)}` : '无需支付'}
               </li>
             ))}
           </ul>
@@ -289,27 +335,17 @@ function App() {
         </div>
       )}
 
-      <button onClick={goHome} className="home-button">返回首页</button>
+      <button onClick={goHome} className="home-button" disabled={loading}>
+        返回首页
+      </button>
     </div>
   );
 
-  // 根据页面状态渲染不同的内容
-  const renderPage = () => {
-    switch (page) {
-      case 'createRoom':
-        return renderCreateRoom();
-      case 'joinRoom':
-        return renderJoinRoom();
-      case 'room':
-        return renderRoom();
-      default:
-        return renderHome();
-    }
-  };
-
   return (
     <div className="App">
-      {renderPage()}
+      {page === 'createRoom' ? renderCreateRoom() :
+       page === 'joinRoom' ? renderJoinRoom() :
+       page === 'room' ? renderRoom() : renderHome()}
     </div>
   );
 }
