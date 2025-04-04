@@ -1,22 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
-  const [page, setPage] = useState('home');
+  const [page, setPage] = useState(() => {
+    const savedRoomId = localStorage.getItem('currentRoomId');
+    return savedRoomId ? 'room' : 'home';
+  });
   const [roomTitle, setRoomTitle] = useState('');
   const [members, setMembers] = useState(['']);
   const [memberInput, setMemberInput] = useState('');
-  const [currentRoomId, setCurrentRoomId] = useState('');
+  const [currentRoomId, setCurrentRoomId] = useState(() => {
+    return localStorage.getItem('currentRoomId') || '';
+  });
   const [joinRoomId, setJoinRoomId] = useState('');
   const [paymentName, setPaymentName] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
-  // 新增花费项目状态
   const [paymentDescription, setPaymentDescription] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const API_URL = 'https://lightsplit-backend-2.onrender.com';
+
+  useEffect(() => {
+    if (currentRoomId) {
+      localStorage.setItem('currentRoomId', currentRoomId);
+    } else {
+      localStorage.removeItem('currentRoomId');
+    }
+  }, [currentRoomId]);
+
+  useEffect(() => {
+    const savedRoomId = localStorage.getItem('currentRoomId');
+    if (savedRoomId && page === 'room') {
+      setJoinRoomId(savedRoomId);
+      fetchResult(savedRoomId);
+    }
+  }, []);
 
   const addMember = () => {
     if (memberInput.trim() !== '') {
@@ -41,6 +61,7 @@ function App() {
         setError('请输入房间标题并至少添加两个成员！');
         return;
       }
+      
       const response = await fetch(`${API_URL}/create_room`, {
         method: 'POST',
         headers: {
@@ -51,16 +72,40 @@ function App() {
           members: filteredMembers,
         }),
       });
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || '创建房间失败');
       }
+      
       const data = await response.json();
       setCurrentRoomId(data.room_id);
+      setRoomTitle(data.title);
+      setMembers(data.members);
       setPage('room');
     } catch (err) {
       setError(err.message);
       console.error('创建房间出错:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchResult = async (roomId = currentRoomId) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/result/${roomId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '获取结果失败');
+      }
+      const data = await response.json();
+      setResult(data);
+      setRoomTitle(data.title);
+      setMembers(data.members || Object.keys(data.balances || {}));
+    } catch (err) {
+      setError(err.message);
+      console.error('获取结果出错:', err);
     } finally {
       setLoading(false);
     }
@@ -75,15 +120,10 @@ function App() {
         setError('请输入有效的房间ID！');
         return;
       }
-      const response = await fetch(`${API_URL}/result/${joinRoomId}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '房间不存在');
-      }
-      const data = await response.json();
+      
+      await fetchResult(joinRoomId);
       setCurrentRoomId(joinRoomId);
       setPage('room');
-      setResult(data);
     } catch (err) {
       setError(err.message);
       console.error('加入房间出错:', err);
@@ -102,7 +142,6 @@ function App() {
         return;
       }
       
-      // 修改后端API调用，添加description字段
       const response = await fetch(`${API_URL}/submit_payment/${currentRoomId}`, {
         method: 'POST',
         headers: {
@@ -111,39 +150,23 @@ function App() {
         body: JSON.stringify({
           name: paymentName,
           amount: parseFloat(paymentAmount),
-          description: paymentDescription || '未指定' // 添加花费项目描述
+          description: paymentDescription || '未指定'
         }),
       });
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || '付款提交失败');
       }
+      
       alert('付款提交成功！');
       setPaymentName('');
       setPaymentAmount('');
-      setPaymentDescription(''); // 清空描述
+      setPaymentDescription('');
       await fetchResult();
     } catch (err) {
       setError(err.message);
       console.error('提交付款出错:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchResult = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/result/${currentRoomId}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '获取结果失败');
-      }
-      const data = await response.json();
-      setResult(data);
-    } catch (err) {
-      setError(err.message);
-      console.error('获取结果出错:', err);
     } finally {
       setLoading(false);
     }
@@ -265,7 +288,6 @@ function App() {
         <h3>提交付款</h3>
         <div>
           <label>姓名</label>
-          {/* 将输入框改为下拉选单 */}
           <select
             value={paymentName}
             onChange={(e) => setPaymentName(e.target.value)}
@@ -273,11 +295,9 @@ function App() {
             className="dropdown-select"
           >
             <option value="">请选择姓名</option>
-            {result && result.title && result.balances && 
-              Object.keys(result.balances).map((name, index) => (
-                <option key={index} value={name}>{name}</option>
-              ))
-            }
+            {(result?.members || []).map((name, index) => (
+              <option key={index} value={name}>{name}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -308,12 +328,10 @@ function App() {
       {result && (
         <div className="result-section">
           <h3>分账结果</h3>
-          
           <div className="summary-info">
             <p>总支出: <strong>{result.total_spent?.toFixed(2)}</strong></p>
             <p>人均支出: <strong>{result.average_per_person?.toFixed(2)}</strong></p>
           </div>
-          
           <h4>每人余额</h4>
           <ul className="balance-list">
             {Object.entries(result.balances || {}).map(([name, balance]) => (
@@ -341,8 +359,6 @@ function App() {
           ) : (
             <p>没有需要转账的款项</p>
           )}
-
-          {/* 显示付款历史 */}
           {result.payments && Object.keys(result.payments).length > 0 && (
             <div className="payment-history">
               <h4>付款记录</h4>
