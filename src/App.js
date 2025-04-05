@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
@@ -11,14 +11,37 @@ function App() {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [paymentName, setPaymentName] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentDescription, setPaymentDescription] = useState(''); // 新增：花费项目描述
+  const [paymentDescription, setPaymentDescription] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [payments, setPayments] = useState([]); // 新增：保存所有支付记录
+  const [payments, setPayments] = useState([]);
 
   // API endpoint
   const API_URL = 'https://lightsplit-backend.onrender.com';
+
+  // 检查URL中是否包含房间ID
+  useEffect(() => {
+    const checkUrlForRoomId = () => {
+      const pathSegments = window.location.pathname.split('/');
+      if (pathSegments.length > 1 && pathSegments[1].length > 0) {
+        const roomIdFromUrl = pathSegments[1];
+        setJoinRoomId(roomIdFromUrl);
+        joinRoomWithId(roomIdFromUrl);
+      }
+    };
+
+    checkUrlForRoomId();
+  }, []);
+
+  // 更新URL
+  const updateUrlWithRoomId = (roomId) => {
+    if (roomId) {
+      window.history.pushState({}, '', `/${roomId}`);
+    } else {
+      window.history.pushState({}, '', '/');
+    }
+  };
 
   // Add member function
   const addMember = () => {
@@ -74,12 +97,14 @@ function App() {
         balances: {},
         transactions: [],
         total_spent: 0,
-        average_per_person: 0
+        average_per_person: 0,
+        payment_records: []
       };
       
       setResult(initialResult);
-      setPayments([]); // 重置支付记录
+      setPayments([]);
       setPage('room');
+      updateUrlWithRoomId(roomId); // 更新URL
     } catch (err) {
       setError(err.message);
       console.error('创建房间出错:', err);
@@ -88,35 +113,45 @@ function App() {
     }
   };
 
-  // Join room function
-  const joinRoom = async () => {
+  // Join room with ID function (用于URL直接访问)
+  const joinRoomWithId = async (roomId) => {
     try {
       setLoading(true);
       setError('');
       
-      if (joinRoomId.trim() === '') {
-        setError('请输入有效的房间ID！');
+      if (!roomId.trim()) {
         setLoading(false);
         return;
       }
 
-      const response = await fetch(`${API_URL}/result/${joinRoomId}`);
+      const response = await fetch(`${API_URL}/result/${roomId}`);
       
       if (!response.ok) {
         throw new Error('房间不存在');
       }
 
       const data = await response.json();
-      setCurrentRoomId(joinRoomId);
+      setCurrentRoomId(roomId);
       setResult(data);
-      setPayments([]); // 重置支付记录，实际应从后端获取
+      // 从后端获取支付记录
+      if (data.payment_records) {
+        setPayments(data.payment_records);
+      } else {
+        setPayments([]);
+      }
       setPage('room');
+      updateUrlWithRoomId(roomId); // 更新URL
     } catch (err) {
-      setError(err.message);
+      setError(`加入房间失败: ${err.message}`);
       console.error('加入房间出错:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Join room function (用于表单输入)
+  const joinRoom = async () => {
+    await joinRoomWithId(joinRoomId);
   };
 
   // Submit payment function
@@ -133,18 +168,7 @@ function App() {
 
       const amount = parseFloat(paymentAmount);
       
-      // 记录支付信息到本地状态
-      const newPayment = {
-        id: Date.now(), // 简单使用时间戳作为ID
-        name: paymentName,
-        amount: amount,
-        description: paymentDescription || '未填写描述', // 如果没有描述，使用默认值
-        date: new Date().toLocaleString('zh-CN') // 记录当前时间
-      };
-      
-      setPayments(prevPayments => [...prevPayments, newPayment]);
-
-      // 提交到后端
+      // 提交到后端，包括描述信息
       const response = await fetch(`${API_URL}/submit_payment/${currentRoomId}`, {
         method: 'POST',
         headers: {
@@ -153,6 +177,7 @@ function App() {
         body: JSON.stringify({
           name: paymentName,
           amount: amount,
+          description: paymentDescription || '未填写描述'
         }),
       });
 
@@ -188,11 +213,15 @@ function App() {
       
       // 确保结果中包含成员列表
       if (!data.members || data.members.length === 0) {
-        // 如果结果中没有成员列表，使用当前的结果中的成员列表
         data.members = result?.members || [];
       }
       
       setResult(data);
+      
+      // 从后端获取支付记录
+      if (data.payment_records) {
+        setPayments(data.payment_records);
+      }
     } catch (err) {
       setError(err.message);
       console.error('获取结果出错:', err);
@@ -209,12 +238,20 @@ function App() {
     setResult(null);
     setPayments([]);
     setError('');
+    updateUrlWithRoomId(''); // 清除URL中的房间ID
   };
 
   // Copy room ID function
   const copyRoomId = () => {
     navigator.clipboard.writeText(currentRoomId);
     alert('房间ID已复制到剪贴板！');
+  };
+
+  // 复制分享链接
+  const copyShareLink = () => {
+    const shareLink = `${window.location.origin}/${currentRoomId}`;
+    navigator.clipboard.writeText(shareLink);
+    alert('分享链接已复制到剪贴板！');
   };
 
   // Render home page
@@ -321,6 +358,9 @@ function App() {
         <button onClick={copyRoomId} className="copy-button" disabled={loading}>
           复制ID
         </button>
+        <button onClick={copyShareLink} className="copy-button" disabled={loading}>
+          复制分享链接
+        </button>
       </div>
       
       {/* 支付表单 */}
@@ -387,7 +427,7 @@ function App() {
               {payments.map(payment => (
                 <tr key={payment.id}>
                   <td>{payment.name}</td>
-                  <td>¥{payment.amount.toFixed(2)}</td>
+                  <td>¥{typeof payment.amount === 'number' ? payment.amount.toFixed(2) : payment.amount}</td>
                   <td>{payment.description}</td>
                   <td>{payment.date}</td>
                 </tr>
