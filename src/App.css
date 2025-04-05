@@ -186,3 +186,21 @@ button:disabled {
 .home-button:hover {
   background-color: #0b7dda;
 }
+
+/* 在您现有的App.css文件中添加下面这段代码 */
+
+.select-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  background-color: white;
+  font-size: 16px;
+}
+
+.select-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
