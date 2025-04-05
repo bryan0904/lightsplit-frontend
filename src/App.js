@@ -63,6 +63,15 @@ function App() {
 
       const data = await response.json();
       setCurrentRoomId(data.room_id);
+      
+      // 获取房间数据
+      const resultResponse = await fetch(`${API_URL}/result/${data.room_id}`);
+      if (!resultResponse.ok) {
+        throw new Error('获取房间数据失败');
+      }
+      const resultData = await resultResponse.json();
+      setResult(resultData);
+      
       setPage('room');
     } catch (err) {
       setError(err.message);
@@ -293,7 +302,7 @@ function App() {
             className="select-input"
           >
             <option value="">选择成员</option>
-            {result?.members?.map((member) => (
+            {result && result.members && result.members.map((member) => (
               <option key={member} value={member}>{member}</option>
             ))}
           </select>
