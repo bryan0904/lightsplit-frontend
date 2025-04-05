@@ -109,7 +109,7 @@ function App() {
       setError('');
       
       if (paymentName.trim() === '' || !paymentAmount || parseFloat(paymentAmount) <= 0) {
-        setError('请输入姓名和有效的付款金额！');
+        setError('请选择成员并输入有效的付款金额！');
         setLoading(false);
         return;
       }
@@ -286,13 +286,17 @@ function App() {
         <h3>提交付款</h3>
         <div>
           <label>姓名</label>
-          <input
-            type="text"
+          <select
             value={paymentName}
             onChange={(e) => setPaymentName(e.target.value)}
-            placeholder="您的姓名"
             disabled={loading}
-          />
+            className="select-input"
+          >
+            <option value="">选择成员</option>
+            {result?.members?.map((member) => (
+              <option key={member} value={member}>{member}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label>金额</label>
