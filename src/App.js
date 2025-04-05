@@ -11,9 +11,11 @@ function App() {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [paymentName, setPaymentName] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDescription, setPaymentDescription] = useState(''); // 新增：花费项目描述
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [payments, setPayments] = useState([]); // 新增：保存所有支付记录
 
   // API endpoint
   const API_URL = 'https://lightsplit-backend.onrender.com';
@@ -76,6 +78,7 @@ function App() {
       };
       
       setResult(initialResult);
+      setPayments([]); // 重置支付记录
       setPage('room');
     } catch (err) {
       setError(err.message);
@@ -106,6 +109,7 @@ function App() {
       const data = await response.json();
       setCurrentRoomId(joinRoomId);
       setResult(data);
+      setPayments([]); // 重置支付记录，实际应从后端获取
       setPage('room');
     } catch (err) {
       setError(err.message);
@@ -127,6 +131,20 @@ function App() {
         return;
       }
 
+      const amount = parseFloat(paymentAmount);
+      
+      // 记录支付信息到本地状态
+      const newPayment = {
+        id: Date.now(), // 简单使用时间戳作为ID
+        name: paymentName,
+        amount: amount,
+        description: paymentDescription || '未填写描述', // 如果没有描述，使用默认值
+        date: new Date().toLocaleString('zh-CN') // 记录当前时间
+      };
+      
+      setPayments(prevPayments => [...prevPayments, newPayment]);
+
+      // 提交到后端
       const response = await fetch(`${API_URL}/submit_payment/${currentRoomId}`, {
         method: 'POST',
         headers: {
@@ -134,7 +152,7 @@ function App() {
         },
         body: JSON.stringify({
           name: paymentName,
-          amount: parseFloat(paymentAmount),
+          amount: amount,
         }),
       });
 
@@ -148,6 +166,7 @@ function App() {
       // Reset payment inputs
       setPaymentName('');
       setPaymentAmount('');
+      setPaymentDescription('');
     } catch (err) {
       setError(err.message);
       console.error('提交付款出错:', err);
@@ -188,6 +207,7 @@ function App() {
     setCurrentRoomId('');
     setJoinRoomId('');
     setResult(null);
+    setPayments([]);
     setError('');
   };
 
@@ -302,6 +322,8 @@ function App() {
           复制ID
         </button>
       </div>
+      
+      {/* 支付表单 */}
       <div className="form-group">
         <h3>提交付款</h3>
         <div>
@@ -330,17 +352,59 @@ function App() {
             disabled={loading}
           />
         </div>
-        <button onClick={submitPayment} disabled={loading || !paymentName.trim() || !paymentAmount || parseFloat(paymentAmount) <= 0}>
+        <div>
+          <label>花费项目</label>
+          <input
+            type="text"
+            value={paymentDescription}
+            onChange={(e) => setPaymentDescription(e.target.value)}
+            placeholder="如：晚餐、电影票、打车费"
+            disabled={loading}
+          />
+        </div>
+        <button 
+          onClick={submitPayment} 
+          disabled={loading || !paymentName.trim() || !paymentAmount || parseFloat(paymentAmount) <= 0}
+        >
           {loading ? '提交中...' : '提交付款'}
         </button>
       </div>
+      
+      {/* 支付记录列表 */}
+      {payments.length > 0 && (
+        <div className="payment-records">
+          <h3>支付记录</h3>
+          <table className="payment-table">
+            <thead>
+              <tr>
+                <th>支付人</th>
+                <th>金额</th>
+                <th>花费项目</th>
+                <th>时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map(payment => (
+                <tr key={payment.id}>
+                  <td>{payment.name}</td>
+                  <td>¥{payment.amount.toFixed(2)}</td>
+                  <td>{payment.description}</td>
+                  <td>{payment.date}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {/* 结果部分 */}
       {result && (
         <div className="result-section">
           <h3>分账结果</h3>
           
           <div className="summary-info">
-            <p>总支出: <strong>{result.total_spent?.toFixed(2)}</strong></p>
-            <p>人均支出: <strong>{result.average_per_person?.toFixed(2)}</strong></p>
+            <p>总支出: <strong>¥{result.total_spent?.toFixed(2)}</strong></p>
+            <p>人均支出: <strong>¥{result.average_per_person?.toFixed(2)}</strong></p>
           </div>
           
           <h4>每人余额</h4>
@@ -353,8 +417,8 @@ function App() {
                   balance < 0 ? 'negative' : 'neutral'
                 }
               >
-                {name}: {balance > 0 ? `应收 ${balance.toFixed(2)}` : 
-                          balance < 0 ? `应付 ${Math.abs(balance).toFixed(2)}` : '无需支付'}
+                {name}: {balance > 0 ? `应收 ¥${balance.toFixed(2)}` : 
+                          balance < 0 ? `应付 ¥${Math.abs(balance).toFixed(2)}` : '无需支付'}
               </li>
             ))}
           </ul>
@@ -363,7 +427,7 @@ function App() {
             <ul className="transaction-list">
               {result.transactions.map((transaction, index) => (
                 <li key={index} className="transaction-item">
-                  {transaction.from} 需要支付 <span className="amount">{transaction.amount.toFixed(2)}</span> 给 {transaction.to}
+                  {transaction.from} 需要支付 <span className="amount">¥{transaction.amount.toFixed(2)}</span> 给 {transaction.to}
                 </li>
               ))}
             </ul>
