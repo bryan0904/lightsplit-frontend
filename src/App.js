@@ -75,26 +75,7 @@ function App() {
         average_per_person: 0
       };
       
-      // 同时也从后端获取结果（虽然可能是空的）
-      try {
-        const resultResponse = await fetch(`${API_URL}/result/${roomId}`);
-        if (resultResponse.ok) {
-          const resultData = await resultResponse.json();
-          // 确保结果中包含成员列表
-          if (!resultData.members || resultData.members.length === 0) {
-            resultData.members = filteredMembers;
-          }
-          setResult(resultData);
-        } else {
-          // 如果获取结果失败，使用初始数据
-          setResult(initialResult);
-        }
-      } catch (err) {
-        console.error('获取结果出错:', err);
-        // 如果获取结果失败，使用初始数据
-        setResult(initialResult);
-      }
-      
+      setResult(initialResult);
       setPage('room');
     } catch (err) {
       setError(err.message);
@@ -309,12 +290,6 @@ function App() {
       </div>
     </div>
   );
-
-  // Debug function
-  const debugMembers = () => {
-    console.log("当前成员列表:", result?.members);
-    alert("当前成员列表: " + (result?.members ? JSON.stringify(result.members) : "无数据"));
-  };
 
   // Render room page
   const renderRoom = () => (
