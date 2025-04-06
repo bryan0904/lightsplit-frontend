@@ -240,3 +240,146 @@ button:disabled {
   outline: none;
   border-color: #4CAF50;
 }
+
+/* 添加到CSS文件底部 */
+.payment-row {
+  position: relative;
+  transition: transform 0.3s ease;
+  cursor: pointer;
+}
+
+.payment-row.swiped {
+  transform: translateX(-120px);
+}
+
+.action-buttons {
+  position: absolute;
+  right: -120px;
+  top: 0;
+  height: 100%;
+  display: flex;
+  width: 120px;
+}
+
+.edit-button, .delete-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 100%;
+  color: white;
+  font-size: 14px;
+  border: none;
+}
+
+.edit-button {
+  background-color: #2196F3;
+}
+
+.delete-button {
+  background-color: #F44336;
+}
+
+/* 编辑支付记录的模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 多选下拉框样式 */
+.checkbox-dropdown {
+  position: relative;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  box-sizing: border-box;
+  background-color: white;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.checkbox-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  background-color: white;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.checkbox-item {
+  padding: 10px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-item:last-child {
+  border-bottom: none;
+}
+
+.checkbox-item input {
+  margin-right: 10px;
+  width: auto;
+}
+
+.selected-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.selected-option {
+  background-color: #e0f7fa;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  display: inline-block;
+}
+
+.dropdown-placeholder {
+  color: #999;
+}
